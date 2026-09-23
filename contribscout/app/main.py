@@ -1,0 +1,41 @@
+import logging
+import os
+
+from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+
+from .mcp.tools.analysis import build_contribution_plan, find_contribution_opportunities, pre_contribution_check, analyze_repository_tool
+from .mcp.tools.files import get_file, search_repository_markers
+from .mcp.tools.issues import get_issue, list_issues
+from .mcp.tools.pulls import list_pull_requests
+from .mcp.tools.repository import get_recent_commits, get_repository, get_repository_tree
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+mcp = FastMCP(
+    "ContribScout",
+    instructions=(
+        "Read-only assistant for public GitHub repositories. Use structured GitHub data and deterministic "
+        "heuristics to distinguish OFFICIAL_ISSUE items from DISCOVERED_OPPORTUNITY items. "
+        "Do not imply access to a user's ChatGPT history or guarantee maintainer acceptance."
+    ),
+    host=os.getenv("MCP_HOST", "127.0.0.1"),
+    port=int(os.getenv("MCP_PORT", "8000")),
+)
+
+for tool in (get_repository, get_repository_tree, get_file, list_issues, get_issue, list_pull_requests, get_recent_commits, search_repository_markers, analyze_repository_tool, find_contribution_opportunities, pre_contribution_check, build_contribution_plan):
+    public_name = "analyze_repository" if tool is analyze_repository_tool else None
+    mcp.tool(name=public_name, annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True, destructiveHint=False))(tool)
+
+
+def main() -> None:
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport == "streamable-http":
+        mcp.run(transport="streamable-http")
+    elif transport == "stdio":
+        mcp.run(transport="stdio")
+    else:
+        raise ValueError("MCP_TRANSPORT must be stdio or streamable-http")
+
+
+if __name__ == "__main__":
+    main()

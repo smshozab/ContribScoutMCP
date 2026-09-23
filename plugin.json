@@ -1,0 +1,8 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "contribscout",
+  "version": "0.1.0",
+  "description": "Find evidence-backed contribution opportunities in public GitHub repositories.",
+  "license": "MIT",
+  "keywords": ["open source", "GitHub", "contributions", "developer tools"]
+}
