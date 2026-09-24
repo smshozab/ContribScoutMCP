@@ -17,10 +17,10 @@ Run these against the deployed HTTPS MCP endpoint after scanning its tools. Reco
    - Fixture: public repository URL; no account required.
 
 3. **Official issue suitability**
-   - Prompt: “Check whether issue #<OPEN_ISSUE_NUMBER> in <PUBLIC_REPOSITORY_URL> is suitable for a first contribution. Explain the evidence and current competition.”
+   - Prompt: “Check whether issue #6146 in `https://github.com/pallets/flask` is suitable for a first contribution. Explain the evidence and current competition.”
    - Expected behavior: use `get_issue`, `list_pull_requests`, issue analysis, then `pre_contribution_check` before recommending a start.
    - Expected result: issue status, assignment/PR evidence, heuristic suitability, caveats, and a cautious next step.
-   - Fixture: replace placeholders with a currently open issue and public repository URL before submitting.
+   - Fixture: `pallets/flask#6146` (“Add Cloudflare to Flask Hosting Platforms docs?”), verified open on 2026-09-24; recheck issue state before a submission run.
 
 4. **Marker and gap discovery**
    - Prompt: “Scan `https://github.com/harrymunro/jev-laya-benchmark` for TODOs and potential test or documentation gaps. Tell me which are discovered hypotheses.”
@@ -29,10 +29,10 @@ Run these against the deployed HTTPS MCP endpoint after scanning its tools. Reco
    - Fixture: public repository URL; no account required.
 
 5. **Implementation roadmap**
-   - Prompt: “Build a contribution plan for issue #<OPEN_ISSUE_NUMBER> in <PUBLIC_REPOSITORY_URL>, including likely files, steps, tests, risks, and questions for maintainers.”
+   - Prompt: “Build a contribution plan for issue #6146 in `https://github.com/pallets/flask`, including likely files, steps, tests, risks, and questions for maintainers.”
    - Expected behavior: call `build_contribution_plan`; run `pre_contribution_check` first for an official issue.
    - Expected result: structured roadmap using existing files or explicitly proposed new files; never fabricate references or promise acceptance.
-   - Fixture: replace placeholders with a currently open issue and public repository URL before submitting.
+   - Fixture: `pallets/flask#6146` verified open on 2026-09-24; recheck issue state before a submission run.
 
 ## Negative cases
 

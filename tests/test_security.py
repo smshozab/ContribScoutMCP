@@ -75,3 +75,23 @@ def test_remote_listener_requires_long_secret_but_localhost_does_not():
         validate_remote_auth("0.0.0.0", None)
     with pytest.raises(RuntimeError, match="at least 32 characters"):
         validate_remote_auth("::", "too-short")
+
+
+def test_oauth_can_protect_remote_listener_without_static_secret():
+    validate_remote_auth("0.0.0.0", None, oauth_enabled=True)
+
+
+@pytest.mark.asyncio
+async def test_oauth_middleware_passes_bearer_request_to_sdk_verifier():
+    app = McpAccessMiddleware(_ok_app, token=None, oauth_enabled=True)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/mcp", headers={"Authorization": "Bearer opaque-or-jwt"})
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_oauth_protected_resource_metadata_path_is_forwarded():
+    app = McpAccessMiddleware(_ok_app, token=None, oauth_enabled=True)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/.well-known/oauth-protected-resource")
+    assert response.status_code == 200
