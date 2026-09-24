@@ -9,8 +9,11 @@ from .mcp.tools.files import get_file, search_repository_markers
 from .mcp.tools.issues import get_issue, list_issues
 from .mcp.tools.pulls import list_pull_requests
 from .mcp.tools.repository import get_recent_commits, get_repository, get_repository_tree
+from .security import McpAccessMiddleware, validate_remote_auth
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+HOST = os.getenv("MCP_HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT") or os.getenv("MCP_PORT") or "8000")
 mcp = FastMCP(
     "ContribScout",
     instructions=(
@@ -18,8 +21,8 @@ mcp = FastMCP(
         "heuristics to distinguish OFFICIAL_ISSUE items from DISCOVERED_OPPORTUNITY items. "
         "Do not imply access to a user's ChatGPT history or guarantee maintainer acceptance."
     ),
-    host=os.getenv("MCP_HOST", "127.0.0.1"),
-    port=int(os.getenv("MCP_PORT", "8000")),
+    host=HOST,
+    port=PORT,
 )
 
 for tool in (get_repository, get_repository_tree, get_file, list_issues, get_issue, list_pull_requests, get_recent_commits, search_repository_markers, analyze_repository_tool, find_contribution_opportunities, pre_contribution_check, build_contribution_plan):
@@ -30,7 +33,27 @@ for tool in (get_repository, get_repository_tree, get_file, list_issues, get_iss
 def main() -> None:
     transport = os.getenv("MCP_TRANSPORT", "stdio")
     if transport == "streamable-http":
-        mcp.run(transport="streamable-http")
+        token = os.getenv("MCP_AUTH_TOKEN", "").strip()
+        validate_remote_auth(HOST, token)
+        from .config import get_settings
+        import uvicorn
+
+        settings = get_settings()
+        app = McpAccessMiddleware(
+            mcp.streamable_http_app(),
+            token=token or None,
+            requests_per_minute=settings.mcp_rate_limit_per_minute,
+        )
+        logger = logging.getLogger("contribscout.server")
+        logger.info("Starting Streamable HTTP MCP server on %s:%s", HOST, PORT)
+        uvicorn.run(
+            app,
+            host=HOST,
+            port=PORT,
+            limit_concurrency=100,
+            timeout_keep_alive=15,
+            server_header=False,
+        )
     elif transport == "stdio":
         mcp.run(transport="stdio")
     else:

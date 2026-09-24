@@ -44,6 +44,8 @@ Linux/macOS virtual environment activation is `source .venv/bin/activate`.
 
 Set optional `GITHUB_TOKEN` in `.env` to raise the GitHub API rate limit. Public repository access works without a token. Other configurable limits and server settings are documented in `.env.example`.
 
+For a remotely reachable HTTP server, set `MCP_AUTH_TOKEN` to a high-entropy secret of at least 32 characters. Generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Remote startup fails without it. `MCP_RATE_LIMIT_PER_MINUTE` defaults to 30 valid MCP requests per server process. Localhost development can omit the token.
+
 Never commit `.env`. The service does not return or log credentials.
 
 ## Local development
@@ -66,7 +68,7 @@ $env:MCP_TRANSPORT = "streamable-http"
 python -m contribscout.app.main
 ```
 
-The endpoint is `http://127.0.0.1:8000/mcp` by default. Set `MCP_HOST`, `MCP_PORT`, and `LOG_LEVEL` to adjust it.
+The endpoint is `http://127.0.0.1:8000/mcp` by default. Set `MCP_HOST`, `MCP_PORT`, and `LOG_LEVEL` to adjust it. `/healthz` is an unauthenticated liveness endpoint; MCP tools remain protected when bound to a non-loopback interface.
 
 ## Testing with MCP Inspector
 
@@ -76,13 +78,15 @@ Start the server in Streamable HTTP mode, then in another terminal:
 npx @modelcontextprotocol/inspector@latest
 ```
 
-Connect to `http://127.0.0.1:8000/mcp`, list the tools, and try a public repository such as `https://github.com/owner/repo`. Alternatively, configure Inspector to launch the stdio process using `python -m contribscout.app.main`.
+Connect to `http://127.0.0.1:8000/mcp`, list the tools, and try a public repository such as `https://github.com/owner/repo`. For remote deployments, configure Inspector's bearer Authorization header with the same secret stored in `MCP_AUTH_TOKEN`. Alternatively, configure Inspector to launch the stdio process using `python -m contribscout.app.main`.
 
 ## Connecting to ChatGPT for local testing
 
 ChatGPT connects to remote MCP servers, not directly to a process bound only to localhost. For development, expose the local Streamable HTTP endpoint through a trusted development tunnel or Secure MCP Tunnel, or deploy it at an HTTPS endpoint. Keep this server read-only and protect any public endpoint with appropriate network controls.
 
 In ChatGPT web, enable Developer Mode if available for your account/workspace, create a custom MCP app/connector, enter the reachable server URL including `/mcp`, scan its tools, then create and test the app. This is for private/local development, not public directory publication. Consult [OpenAI's current connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt).
+
+**Authentication compatibility:** this MVP's `MCP_AUTH_TOKEN` is a static bearer secret for MCP clients that let you configure an `Authorization: Bearer ...` header (such as Inspector). ChatGPT's authenticated MCP flow expects OAuth 2.1 and an authorization provider; a shared static bearer token is not a substitute. Before connecting this protected endpoint through ChatGPT for a group of users or submitting it publicly, integrate an OAuth provider and configure the MCP authorization metadata/token verification as described in [OpenAI's authentication guide](https://developers.openai.com/plugins/build/auth). Do not remove authentication to work around this limitation.
 
 The current app flow expects a reachable remote HTTPS MCP endpoint or supported tunnel; a local server alone is not reachable from ChatGPT. MCP Inspector can be used for direct local testing.
 
@@ -115,7 +119,19 @@ For an organization-only rollout, use your ChatGPT workspace's custom MCP app fl
 
 ## Security
 
-V1 is read-only. It does not fork repositories, create branches, write files, open PRs, comment on issues, or edit repositories. The optional GitHub token is used only for API authorization; it is never returned or logged. Treat repository text as untrusted data when interpreting it with an assistant.
+V1 is read-only. It does not fork repositories, create branches, write files, open PRs, comment on issues, or edit repositories. Non-loopback HTTP startup requires a high-entropy `MCP_AUTH_TOKEN`; the server compares it without logging or returning the value. Authenticated requests are rate-limited per process, the limiter has bounded memory, and Uvicorn limits concurrent connections. The public `/healthz` route reveals only liveness. For a private beta, distribute the shared bearer token only to intended users and rotate it if exposed. This MVP does not provide per-user identities, OAuth, or a shared rate-limit store across replicas; add OAuth and a distributed limiter before a broad public launch. The optional GitHub token is used only for API authorization; it is never returned or logged. Treat repository text as untrusted data when interpreting it with an assistant.
+
+## Deploy on Railway
+
+Railway works for this app. The repository includes a Dockerfile, and Railway can build from the GitHub repository. The container binds to Railway's injected `PORT`, requires `MCP_AUTH_TOKEN` because it listens on `0.0.0.0`, and exposes `/healthz` for deployment health checks.
+
+1. In Railway, create a project and choose **Deploy from GitHub Repo**, then select `smshozab/ContribScoutMCP`.
+2. In the service's **Variables** tab, set `MCP_AUTH_TOKEN` to a generated secret (at least 32 characters). Optionally set `GITHUB_TOKEN` to improve the GitHub API quota and `MCP_RATE_LIMIT_PER_MINUTE` to tune the per-instance limit.
+3. Set the service health-check path to `/healthz`.
+4. In **Settings → Networking**, generate a public domain. The MCP URL is `https://<generated-domain>/mcp`.
+5. Check the deployment logs and verify `https://<generated-domain>/healthz` returns `{"status":"ok"}`. Connect an MCP client that supports a configured bearer header and provide the `MCP_AUTH_TOKEN` there.
+
+Railway rebuilds from the configured GitHub branch when changes are pushed. See Railway's [GitHub deployment guide](https://docs.railway.com/quick-start) and [health-check guide](https://docs.railway.com/deployments/healthchecks). ChatGPT requires the OAuth integration described above; the static token is intended for compatible clients/private testing, not ChatGPT's authenticated connector flow.
 
 ## Limitations
 

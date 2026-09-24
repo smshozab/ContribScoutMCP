@@ -16,6 +16,9 @@ class Settings(BaseModel):
     max_issues: int = Field(default_factory=lambda: int(os.getenv("MAX_ISSUES", "100")))
     max_prs: int = Field(default_factory=lambda: int(os.getenv("MAX_PRS", "100")))
     max_results: int = Field(default_factory=lambda: int(os.getenv("MAX_RESULTS", "20")))
+    mcp_rate_limit_per_minute: int = Field(
+        default_factory=lambda: int(os.getenv("MCP_RATE_LIMIT_PER_MINUTE", "30")), ge=1, le=1000
+    )
 
 
 @lru_cache
